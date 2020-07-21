@@ -1,0 +1,2 @@
+include $(SDSLLITE)/Make.helper
+LIBS = -lsdsl -ldivsufsort -ldivsufsort64
