@@ -1,0 +1,347 @@
+\documentclass{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{multirow}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepackage{longtable}
+\usepackage{threeparttable}
+\usepackage{ifthen}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{expl3}
+\ExplSyntaxOn
+\cs_new_eq:NN \fpeval \fp_eval:n
+\ExplSyntaxOff
+\pgfplotsset{compat=1.13}
+\usetikzlibrary{patterns}
+
+\definecolor{webgreen}{rgb}{0,0.5,0}
+
+\title{\vspace{-5ex}Trie benchmark results}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\vspace{-10ex}
+\centering
+
+%%%% test data description %%%%
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{1em}
+\scriptsize
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={file,input_length,num_strings},
+	columns/file/.style={string type,column type=l,column name={File}},
+	columns/num_strings/.style={fixed,column type=r,column name={Number of strings}},
+	columns/input_length/.style={fixed,fixed zerofill,precision=3,preproc/expr={##1/(1024*1024)},column type=r,column name={Size in MB}},
+	]{benchmark.dat}
+\end{threeparttable}
+\caption{Statistics about the trie test data used for experiments. The files were generated as follows:
+	first, all lines containing nullbytes or containing less than 10 characters were removed from
+	the original file. Next, lines containing any other line as proper substring were removed.
+	Resulting files with less than 1 MB or less than 1000 lines were filtered out.
+	The lines of the resulting remaining files then were used as input strings for trie construction.}
+\label{tab:trieinputstatistics}
+\end{table}
+
+%%%% trie representation size %%%%
+
+\begin{figure}[ht]
+\centering
+\pgfplotstablegetrowsof{benchmark.dat}
+\edef\triesizebpsplot{\pgfplotsretval}
+\pgfplotstableset{
+	create on use/trie-xbwt-size-bytepersymbol/.style={
+		create col/expr={\thisrow{XBWT_trie_size}/\thisrow{input_length}}
+	},
+	create on use/trie-txbwt-size-bytepersymbol/.style={
+		create col/expr={\thisrow{TXBWT_trie_size}/\thisrow{input_length}}
+	},
+	create on use/trie-input-length-mbyte/.style={
+		create col/expr={\fpeval{round((\thisrow{input_length}/(1024*1024))*1000)/1000}}
+	}
+}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny input size in MB},
+	yticklabel style={font=\tiny},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={benchmark.dat}{trie-input-length-mbyte},
+	ytick=data,
+	xmin=0,	xmax=2.4,
+	xtick=\empty,
+	bar width=2ex,
+	ymin=-.5,ymax=\triesizebpsplot-.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=\coordindex] {benchmark.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny Trie size in bytes per input symbol},
+	xticklabel style={font=\tiny},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=0,	xmax=2.4,
+	extra x ticks=1,
+	extra x tick labels={},
+	extra x tick style={grid style={black,dashed,very thick}},
+	no markers,
+	xmajorgrids=true,
+	bar width=.8ex,
+	yticklabel style={font=\tiny},
+	yticklabels from table={benchmark.dat}{file},
+	ytick=data,
+	ymin=-.5,ymax=\triesizebpsplot-.5,
+	y dir=reverse,
+	ymajorgrids=true,
+	legend style={legend columns=2,draw=none,at={(0.5,-1ex)},anchor=north},
+	area legend,
+	grid style=dashed]
+\addplot+[bar shift=.4ex, xbar,draw=black,ultra thin,fill=RoyalBlue!30] table [x=trie-xbwt-size-bytepersymbol, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=-.4ex,xbar,draw=black,ultra thin,,fill=Maroon!30] table [x=trie-txbwt-size-bytepersymbol, y expr=\coordindex] {benchmark.dat};
+\legend{\parbox{12em}{\tiny XBWT representation},\parbox{12em}{\tiny Tunneled XBWT representation}}
+\end{axis}
+\end{tikzpicture}
+\caption{Size of trie representations measured relative to the size of the sum of lengths of all input strings.}
+\label{fig:triesizebpsexperiments}
+\end{figure}
+
+%%%% aho corasick search time %%%%
+
+\begin{figure}[ht]
+\centering
+\pgfplotstablegetrowsof{benchmark.dat}
+\edef\ahocorasicktimingplot{\pgfplotsretval}
+\pgfplotstableset{
+	create on use/ahocorasick-grep-speed-mbpersec/.style={
+		create col/expr={(\thisrow{input_length} / (1024*1024))/(\thisrow{grep_time}*\thisrow{num_strings}/1000)}
+	},
+	create on use/ahocorasick-xbwt-speed-mbpersec/.style={
+		create col/expr={(\thisrow{input_length} / (1024*1024))/(\thisrow{XBWT_mpsearch_time} / 1000)}
+	},
+	create on use/ahocorasick-txbwt-speed-mbpersec/.style={
+		create col/expr={(\thisrow{input_length} / (1024*1024))/(\thisrow{TXBWT_mpsearch_time} / 1000)}
+	}
+}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny number of occurrences},
+	yticklabel style={font=\tiny},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={benchmark.dat}{XBWT_mpsearch_hits},
+	ytick=data,
+	xmin=0,	xmax=3000,
+	xtick=\empty,
+	bar width=2ex,
+	ymin=-.5,ymax=\ahocorasicktimingplot-.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=\coordindex] {benchmark.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny multi-pattern search speed (string length / required time) in MB/s},
+	xticklabel style={font=\tiny},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=0,	xmax=2.8,
+	no markers,
+	xmajorgrids=true,
+	bar width=.4ex,
+	yticklabel style={font=\tiny},
+	yticklabels from table={benchmark.dat}{file},
+	ytick=data,
+	ymin=-.5,ymax=\ahocorasicktimingplot-.5,
+	y dir=reverse,
+	ymajorgrids=true,
+	legend style={legend columns=3,draw=none,at={(0.5,-1ex)},anchor=north},
+	area legend,
+	grid style=dashed]
+\addplot+[bar shift=.4ex, xbar,draw=black,ultra thin,fill=webgreen!30] table [x=ahocorasick-grep-speed-mbpersec, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=.0ex, xbar,draw=black,ultra thin,fill=RoyalBlue!30] table [x=ahocorasick-xbwt-speed-mbpersec, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=-.4ex,xbar,draw=black,ultra thin,,fill=Maroon!30] table [x=ahocorasick-txbwt-speed-mbpersec, y expr=\coordindex] {benchmark.dat};
+\legend{\parbox{7.5em}{\tiny multiple single-pattern\newline searches for all desired\newline patterns using \texttt{grep}},
+	\parbox{7.5em}{\tiny Aho Corasick algorithm\newline using XBWT},
+	\parbox{7.5em}{\tiny Aho Corasick algorithm\newline using tunneled XBWT}}
+\end{axis}
+\end{tikzpicture}
+\caption{Speed of the multi-pattern search using the Aho Corasick algorithm compared to multiple single-pattern searches for all patterns using
+	\texttt{grep}. The Aho Corasick algorithm uses a priori constructed tries of the test files and searches
+	for all occurrences of the test file lines within the same test file. The \texttt{grep} speed is estimated
+	by executing $\mathtt{grep}$ with the last pattern of each file and multiplying the required time by
+	the number of overall patterns.}
+\label{fig:ahocorasicktimingexperiments}
+\end{figure}
+
+%%%% construction time %%%%
+
+\begin{figure}[ht]
+\centering
+\pgfplotstablegetrowsof{benchmark.dat}
+\edef\trieconstructtimingplot{\pgfplotsretval}
+\pgfplotstableset{
+	create on use/tconstruct-xbwt-fast-fmrelpercent/.style={
+		create col/expr={100 + \thisrow{XBWT_trie_time}/\thisrow{XBWT_fm_time}*100}
+	},
+	create on use/tconstruct-xbwt-fast-sc-fmrelpercent/.style={
+		create col/expr={100 + \thisrow{XBWT_SC_trie_time}/\thisrow{XBWT_fm_time}*100}
+	},
+	create on use/tconstruct-xbwt-lw-fmrelpercent/.style={
+		create col/expr={100 + \thisrow{XBWT_LW_trie_time}/\thisrow{XBWT_fm_time}*100}
+	},
+	create on use/tconstruct-xbwt-lw-sc-fmrelpercent/.style={
+		create col/expr={100 + \thisrow{XBWT_LW_SC_trie_time}/\thisrow{XBWT_fm_time}*100}
+	},
+	create on use/tconstruct-txbwt-fmrelpercent/.style={
+		create col/expr={100 + \thisrow{TXBWT_trie_time}/\thisrow{XBWT_fm_time}*100}
+	},
+	create on use/tconstruct-txbwt-sc-fmrelpercent/.style={
+		create col/expr={100 + \thisrow{TXBWT_SC_trie_time}/\thisrow{XBWT_fm_time}*100}
+	}
+}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny time for FM-index construction in seconds},
+	yticklabel style={font=\tiny},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={benchmark.dat}{XBWT_fm_time},
+	ytick=data,
+	xmin=100,xmax=800,
+	xtick=\empty,
+	bar width=2ex,
+	ymin=-.5,ymax=\trieconstructtimingplot-.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=\coordindex] {benchmark.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny Complete trie construction time relative to FM-index construction time},
+	xticklabel style={font=\tiny},
+	xticklabel={\pgfmathprintnumber\tick\%},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=100,xmax=800,
+	no markers,
+	xmajorgrids=true,
+	bar width=.4ex,
+	yticklabel style={font=\tiny},
+	yticklabels from table={benchmark.dat}{file},
+	ytick=data,
+	ymin=-.5,ymax=\trieconstructtimingplot-.5,
+	y dir=reverse,
+	ymajorgrids=true,
+	legend style={legend columns=3,draw=none,at={(0.5,-1ex)},anchor=north},
+	area legend,
+	grid style=dashed]
+%normal
+\addplot+[bar shift=.4ex, xbar,draw=black,ultra thin,fill=RoyalBlue!30] table [x=tconstruct-xbwt-fast-fmrelpercent, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=0ex,  xbar,draw=black,ultra thin,fill=webgreen!30] table [x=tconstruct-xbwt-lw-fmrelpercent, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=-.4ex,xbar,draw=black,ultra thin,fill=Maroon!30] table [x=tconstruct-txbwt-fmrelpercent, y expr=\coordindex] {benchmark.dat};
+%lightweight
+\addplot+[bar shift=.4ex, xbar,ultra thin,draw=RoyalBlue!70,solid,pattern=north west lines,pattern color=RoyalBlue!70]
+	table [x=tconstruct-xbwt-fast-sc-fmrelpercent, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=0ex,  xbar,ultra thin,draw=webgreen!70,solid,pattern=north west lines,pattern color=webgreen!70]
+	table [x=tconstruct-xbwt-lw-sc-fmrelpercent, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=-.4ex,xbar,ultra thin,draw=Maroon!70,solid,pattern=north west lines,pattern color=Maroon!70]
+	table [x=tconstruct-txbwt-sc-fmrelpercent, y expr=\coordindex] {benchmark.dat};
+\legend{\parbox{7.5em}{\tiny XBWT fast},\parbox{7.5em}{\tiny XBWT lightweight},\parbox{7.5em}{\tiny Tunneled XBWT},
+	\parbox{7.5em}{\tiny XBWT fast SC},\parbox{7.5em}{\tiny XBWT lightweight SC},\parbox{7.5em}{\tiny Tunneled XBWT SC}}
+\end{axis}
+\end{tikzpicture}
+\caption{Trie construction timings of different algorithms relative to FM-index construction.
+	Algorithm variants using a succinct counter instead of a normal counter are indicated
+	by the same color and a north west line pattern.}
+\label{fig:trieconstructtimingexperiments}
+\end{figure}
+
+%%%% required memory peak %%%%
+
+\begin{figure}[ht]
+\centering
+\pgfplotstablegetrowsof{benchmark.dat}
+\edef\trieconstructmempeakplot{\pgfplotsretval}
+\pgfplotstableset{
+	create on use/tconstruct-xbwt-fast-mpbpc/.style={
+		create col/expr={\thisrow{XBWT_trie_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tconstruct-xbwt-fast-sc-mpbpc/.style={
+		create col/expr={\thisrow{XBWT_SC_trie_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tconstruct-xbwt-lw-mpbpc/.style={
+		create col/expr={\thisrow{XBWT_LW_trie_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tconstruct-xbwt-lw-sc-mpbpc/.style={
+		create col/expr={\thisrow{XBWT_LW_SC_trie_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tconstruct-txbwt-mpbpc/.style={
+		create col/expr={\thisrow{TXBWT_trie_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tconstruct-txbwt-sc-mpbpc/.style={
+		create col/expr={\thisrow{TXBWT_SC_trie_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tconstruct-input-length-mbyte/.style={
+		create col/expr={\fpeval{round((\thisrow{input_length}/(1024*1024))*1000)/1000}}
+	}
+}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny input size in MB},
+	yticklabel style={font=\tiny},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={benchmark.dat}{tconstruct-input-length-mbyte},
+	ytick=data,
+	xmin=1,	xmax=5,
+	xtick=\empty,
+	bar width=2ex,
+	ymin=-.5,ymax=\trieconstructmempeakplot-.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=\coordindex] {benchmark.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny Memory peak in bytes per input symbol excluding FM-index construction},
+	xticklabel style={font=\tiny},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=1,	xmax=5,
+	no markers,
+	xmajorgrids=true,
+	bar width=.4ex,
+	yticklabel style={font=\tiny},
+	yticklabels from table={benchmark.dat}{file},
+	ytick=data,
+	ymin=-.5,ymax=\trieconstructmempeakplot-.5,
+	y dir=reverse,
+	ymajorgrids=true,
+	grid style=dashed,
+	legend style={legend columns=3,no markers,draw=none,at={(0.5,-1ex)},anchor=north},
+	area legend]
+%normal
+\addplot+[bar shift=.4ex, xbar,draw=black,ultra thin,fill=RoyalBlue!30] table [x=tconstruct-xbwt-fast-mpbpc, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=0ex,  xbar,draw=black,ultra thin,fill=webgreen!30] table [x=tconstruct-xbwt-lw-mpbpc, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=-.4ex,xbar,draw=black,ultra thin,fill=Maroon!30] table [x=tconstruct-txbwt-mpbpc, y expr=\coordindex] {benchmark.dat};
+%lightweight
+\addplot+[bar shift=.4ex, xbar,ultra thin,draw=RoyalBlue!70,solid,pattern=north west lines,pattern color=RoyalBlue!70]
+	table [x=tconstruct-xbwt-fast-sc-mpbpc, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=0ex,  xbar,ultra thin,draw=webgreen!70,solid,pattern=north west lines,pattern color=webgreen!70]
+	table [x=tconstruct-xbwt-lw-sc-mpbpc, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=-.4ex,xbar,ultra thin,draw=Maroon!70,solid,pattern=north west lines,pattern color=Maroon!70]
+	table [x=tconstruct-txbwt-sc-mpbpc, y expr=\coordindex] {benchmark.dat};
+\legend{\parbox{7.5em}{\tiny XBWT fast},\parbox{7.5em}{\tiny XBWT lightweight},\parbox{7.5em}{\tiny Tunneled XBWT},
+	\parbox{7.5em}{\tiny XBWT fast SC},\parbox{7.5em}{\tiny XBWT lightweight SC},\parbox{7.5em}{\tiny Tunneled XBWT SC}}
+\end{axis}
+\end{tikzpicture}
+\caption{Memory peak during trie construction and excluding FM-index construction. The peak is measured in bytes per symbol of the input data.
+	Algorithm variants using a succinct counter instead of a normal counter are indicated
+	by the same color and a north west line pattern.}
+\label{fig:trieconstructmempeakexperiments}
+\end{figure}
+
+\end{document}

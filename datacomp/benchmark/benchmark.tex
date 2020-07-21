@@ -1,0 +1,449 @@
+\documentclass{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{multirow}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepackage{longtable}
+\usepackage{threeparttable}
+\usepackage{ifthen}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{expl3}
+\ExplSyntaxOn
+\cs_new_eq:NN \fpeval \fp_eval:n
+\ExplSyntaxOff
+\pgfplotsset{compat=1.13}
+\usetikzlibrary{patterns}
+
+\definecolor{webgreen}{rgb}{0,0.5,0}
+
+\title{\vspace{-5ex}Data compression benchmark results}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\vspace{-15ex}
+\centering
+
+%%%% compression results %%%%%%
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{.25em}
+\scriptsize
+%end of format issues
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={file,bwz-bps,tbwz-hirsch-bps,tbwz-greedy-bps,tbwz-greedy-update-bps,
+		bcm-bps,tbcm-hirsch-bps,tbcm-greedy-bps,tbcm-greedy-update-bps,xz-extreme-bps,zpaq-bps}
+	,columns/file/.style={string type,column type=l,column name=File}
+	,columns/bwz-bps/.style={string type,column type=c,                     column name=\rotatebox{90}{\parbox{4em}{bw94}}}
+	,columns/tbwz-hirsch-bps/.style={string type,column type=c,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-hirsch}}}
+	,columns/tbwz-greedy-bps/.style={string type,column type=c,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-greedy}}}
+	,columns/tbwz-greedy-update-bps/.style={string type,column type=c,      column name=\rotatebox{90}{\parbox{4em}{bw94-t-gupdate}}}
+	,columns/bcm-bps/.style={string type,column type=c,                     column name=\rotatebox{90}{\parbox{4em}{bcm}}}
+	,columns/tbcm-hirsch-bps/.style={string type,column type=c,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-hirsch}}}
+	,columns/tbcm-greedy-bps/.style={string type,column type=c,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-greedy}}}
+	,columns/tbcm-greedy-update-bps/.style={string type,column type=c,      column name=\rotatebox{90}{\parbox{4em}{bcm-t-gupdate}}}
+	,columns/xz-extreme-bps/.style={string type,column type=c,              column name=\rotatebox{90}{\parbox{4em}{xz}}}
+	,columns/zpaq-bps/.style={string type,column type=c,                    column name=\rotatebox{90}{\parbox{4em}{zpaq}}}
+	,row predicate/.code={
+		\pgfplotstablegetelem{\pgfplotstablerow}{bps-best}\of{result.dat}
+		\edef\rowindex{\pgfplotstablerow}
+		\edef\colname{\pgfplotsretval-bps}
+		\edef\setstyles{\noexpand\pgfplotstableset{
+			every row \rowindex\noexpand\space column \colname/.style={
+				postproc cell content/.append style={
+					/pgfplots/table/@cell content/.add={$\noexpand\mathbf\bgroup}{\egroup$}
+				},
+			}
+		}}\setstyles
+	}]{result.dat}
+\end{threeparttable}
+\caption{Compression results in bits per symbol. The best compression result of each file is highlighted bold.}
+\label{tbl:compresults}
+\end{table}
+
+%%%% tunneling improvements %%%%
+
+\pgfplotstableset{
+	create on use/tbwz-hirsch-improve/.style={create col/expr={(1 - \thisrow{tbwz-hirsch-bps} / \thisrow{bwz-bps}) * 100}},
+	create on use/tbwz-greedy-improve/.style={create col/expr={(1 - \thisrow{tbwz-greedy-bps} / \thisrow{bwz-bps}) * 100}},
+	create on use/tbwz-greedy-update-improve/.style={create col/expr={(1 - \thisrow{tbwz-greedy-update-bps} / \thisrow{bwz-bps}) * 100}},
+	create on use/tbwz-dbg-improve/.style={create col/expr={(1 - \thisrow{tbwz-dbg-bps} / \thisrow{bwz-bps}) * 100}},
+	create on use/tbcm-hirsch-improve/.style={create col/expr={(1 - \thisrow{tbcm-hirsch-bps} / \thisrow{bcm-bps}) * 100}},
+	create on use/tbcm-greedy-improve/.style={create col/expr={(1 - \thisrow{tbcm-greedy-bps} / \thisrow{bcm-bps}) * 100}},
+	create on use/tbcm-greedy-update-improve/.style={create col/expr={(1 - \thisrow{tbcm-greedy-update-bps} / \thisrow{bcm-bps}) * 100}},
+	create on use/tbcm-dbg-improve/.style={create col/expr={(1 - \thisrow{tbcm-dbg-bps} / \thisrow{bcm-bps}) * 100}}
+}
+
+% load some tables
+\pgfplotstableread{result.dat}\resulttable
+\pgfplotstablecreatecol[create col/copy column from table={result_dbg.dat}{bw94-bps}]{tbwz-dbg-bps}\resulttable
+\pgfplotstablecreatecol[create col/copy column from table={result_dbg.dat}{bcm-bps}]{tbcm-dbg-bps}\resulttable
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{.25em}
+\scriptsize
+%end of format issues
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={file,tbwz-hirsch-improve,tbwz-greedy-improve,tbwz-greedy-update-improve,tbwz-dbg-improve,
+	              tbcm-hirsch-improve,tbcm-greedy-improve,tbcm-greedy-update-improve,tbcm-dbg-improve},
+	,columns/file/.style={string type,column type=l,column name=File}
+	,columns/tbwz-hirsch-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bw94-t-hirsch~\newline~}}}
+	,columns/tbwz-greedy-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bw94-t-greedy~\newline~}}}
+	,columns/tbwz-greedy-update-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bw94-t-gupdate~\newline~}}}
+	,columns/tbwz-dbg-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bw94-t-debruijn~\newline~}}}
+	,columns/tbcm-hirsch-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bcm-t-hirsch~\newline~}}}
+	,columns/tbcm-greedy-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bcm-t-greedy~\newline~}}}
+	,columns/tbcm-greedy-update-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bcm-t-gupdate~\newline~}}}
+	,columns/tbcm-dbg-improve/.style={fixed,fixed zerofill,precision=2,postproc cell content/.append style={/pgfplots/table/@cell content/.add={}{ \%}},
+		column type=r,column name=\rotatebox{90}{\parbox{4em}{bcm-t-debruijn~\newline~}}}
+	]{\resulttable}
+\end{threeparttable}
+\caption{Tunneling compression improvements. The numbers show the encoding size differences between the normal
+	and the enhanced BWT compressor relative to the encoding size of the normal BWT compressor.}
+\label{tbl:tunnelingimprovements}
+\end{table}
+
+%%%% optimal tunneling regions and choices of greedy and hirsch in bw94 %%%%
+
+\pgfplotstableset{
+	create on use/improve-best/.style={create col/expr={\thisrow{imp_best}}},
+	columns/improve-best/.style={numeric type}
+}
+
+\begin{figure}[h!t]
+\centering
+\pgfplotstablegetrowsof{result_tinfo.dat}
+\edef\filenummatrixplot{\pgfplotsretval}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny best encoding size decrease in bytes},
+	yticklabel style={font=\tiny,execute at begin node=$, execute at end node=$},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={t_improve_bw94.dat}{improve-best},
+	ytick=data,
+	xmin=-1,xmax=101,
+	xtick=\empty,
+	ymin=.5,ymax=\filenummatrixplot.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=1+\coordindex] {t_improve_bw94.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny amount of rating-sorted tunneled prefix intervals},
+	xticklabel style={font=\tiny},
+	xticklabel pos=top, xlabel near ticks,
+	xticklabel={\pgfmathparse{\tick+1}\pgfmathprintnumber[fixed]{\pgfmathresult} \%},
+	xtick={0,20,40,60,80,100},
+	extra x ticks={100},
+	xmin=-1,xmax=101,
+	yticklabel style={font=\tiny},
+	yticklabel={\pgfmathparse{int(\tick-1)}\pgfplotstablegetelem{\pgfmathresult}{file}\of{result_tinfo.dat}\tiny\pgfplotsretval},
+	ytick={1,...,\filenummatrixplot},
+	ymin=.5,ymax=\filenummatrixplot.5,
+	y dir=reverse,
+	colormap={redyellow}{rgb255(0cm)=(255,255,255); cmyk(10cm)=(0, 0.87, 0.68, 0.32)},
+	colorbar,
+	colorbar horizontal,
+	colorbar style={
+		xtick={0.1,0.9},
+		xticklabels={{\tiny best compression},{\tiny worst compression}},
+		tickwidth={0pt}
+	},
+	enlargelimits=false,
+	axis on top,
+	nodes near coords align={horizontal}]
+	\addplot [matrix plot*,point meta=explicit] file [meta=index 2] {t_matrix_bw94.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ytick=\empty,
+	xmin=-1,xmax=101,
+	xtick=\empty,
+	ymin=.5,ymax=\filenummatrixplot.5,
+	y dir=reverse,
+	nodes near coords align={horizontal}]
+	\addplot[RoyalBlue,thick,only marks,mark=+,point meta=explicit,nodes near coords={\tiny \pgfmathprintnumber[fixed]{\pgfplotspointmeta} byte}]
+		table[y expr=.75+\coordindex,x=rnt_hirsch_percent,meta=imp_hirsch] {t_improve_bw94.dat};
+	\addplot[webgreen,thick,only marks,mark=x,point meta=explicit,nodes near coords={\tiny\pgfmathprintnumber[fixed]{\pgfplotspointmeta} byte}]
+		table[y expr=1.25+\coordindex,x=rnt_greedy_percent,meta=imp_greedy] {t_improve_bw94.dat};
+\end{axis}
+\end{tikzpicture}
+\caption{Optimality of the hirsch and greedy strategy in the bw94 post stage compressor. The amount of tunneled prefix intervals using the hirsch strategy
+	is indicated with blue pluses. The amount of tunneled prefix intervals using the greedy strategy is indicated with green
+	crosses. The best encoding size decrease compared to an compression without tunneling is shown on the right. The encoding size decrease
+	of the hirsch and greedy strategy is shown right beside of the pluses/crosses.}
+\label{fig:tstrat-optimality-bw94}
+\end{figure}
+
+\begin{figure}[h!t]
+\centering
+\pgfplotstablegetrowsof{result_tinfo.dat}
+\edef\filenummatrixplot{\pgfplotsretval}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny best encoding size decrease in bytes},
+	yticklabel style={font=\tiny,execute at begin node=$, execute at end node=$},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={t_improve_bcm.dat}{improve-best},
+	ytick=data,
+	xmin=-1,xmax=101,
+	xtick=\empty,
+	ymin=.5,ymax=\filenummatrixplot.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=1+\coordindex] {t_improve_bcm.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny amount of rating-sorted tunneled prefix intervals},
+	xticklabel style={font=\tiny},
+	xticklabel pos=top, xlabel near ticks,
+	xticklabel={\pgfmathparse{\tick}\pgfmathprintnumber[fixed]{\pgfmathresult} \%},
+	xtick={0,20,40,60,80,100},
+	xmin=-1,xmax=101,
+	yticklabel style={font=\tiny},
+	yticklabel={\pgfmathparse{int(\tick-1)}\pgfplotstablegetelem{\pgfmathresult}{file}\of{result_tinfo.dat}\tiny\pgfplotsretval},
+	ytick={1,...,\filenummatrixplot},
+	ymin=.5,ymax=\filenummatrixplot.5,
+	y dir=reverse,
+	colormap={redyellow}{rgb255(0cm)=(255,255,255); cmyk(10cm)=(0, 0.87, 0.68, 0.32)},
+	colorbar,
+	colorbar horizontal,
+	colorbar style={
+		xtick={0.1,0.9},
+		xticklabels={{\tiny best compression},{\tiny worst compression}},
+		tickwidth={0pt}
+	},
+	enlargelimits=false,
+	axis on top,
+	nodes near coords align={horizontal}]
+	\addplot [matrix plot*,point meta=explicit] file [meta=index 2] {t_matrix_bcm.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ytick=\empty,
+	xmin=-1,xmax=101,
+	xtick=\empty,
+	ymin=.5,ymax=\filenummatrixplot.5,
+	y dir=reverse,
+	nodes near coords align={horizontal}]
+	\addplot[RoyalBlue,thick,only marks,mark=+,point meta=explicit,nodes near coords={\tiny \pgfmathprintnumber[fixed]{\pgfplotspointmeta} byte}]
+		table[y expr=.75+\coordindex,x=rnt_hirsch_percent,meta=imp_hirsch] {t_improve_bcm.dat};
+	\addplot[webgreen,thick,only marks,mark=x,point meta=explicit,nodes near coords={\tiny\pgfmathprintnumber[fixed]{\pgfplotspointmeta} byte}]
+		table[y expr=1.25+\coordindex,x=rnt_greedy_percent,meta=imp_greedy] {t_improve_bcm.dat};
+\end{axis}
+\end{tikzpicture}
+\caption{Optimality of the hirsch and greedy strategy in the bcm post stage compressor. The amount of tunneled prefix intervals using the hirsch strategy
+	is indicated with blue pluses. The amount of tunneled prefix intervals using the greedy strategy is indicated with green
+	crosses. The best encoding size decrease compared to an compression without tunneling is shown on the right. The encoding size decrease
+	of the hirsch and greedy strategy is shown right beside of the pluses/crosses.}
+\label{fig:tstrat-optimality-bcm}
+\end{figure}
+
+%%%% encoding speeds %%%%
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{.25em}
+\scriptsize
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={file,bwz-encode-speed,tbwz-hirsch-encode-speed,tbwz-greedy-encode-speed,tbwz-greedy-update-encode-speed,
+		bcm-encode-speed,tbcm-hirsch-encode-speed,tbcm-greedy-encode-speed,tbcm-greedy-update-encode-speed,
+		xz-extreme-encode-speed,zpaq-encode-speed}
+	,columns/file/.style={string type,column type=l,column name=File}
+	,columns/bwz-encode-speed/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bw94~\newline~}}}
+	,columns/tbwz-hirsch-encode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-hirsch}}}
+	,columns/tbwz-greedy-encode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-greedy}}}
+	,columns/tbwz-greedy-update-encode-speed/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bw94-t-gupdate}}}
+	,columns/bcm-encode-speed/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bcm~\newline~}}}
+	,columns/tbcm-hirsch-encode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-hirsch}}}
+	,columns/tbcm-greedy-encode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-greedy}}}
+	,columns/tbcm-greedy-update-encode-speed/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bcm-t-gupdate}}}
+	,columns/xz-extreme-encode-speed/.style={string type,column type=r,              column name=\rotatebox{90}{\parbox{4em}{xz~\newline~}}}
+	,columns/zpaq-encode-speed/.style={string type,column type=r,                    column name=\rotatebox{90}{\parbox{4em}{zpaq~\newline~}}}
+	,row predicate/.code={
+		\pgfplotstablegetelem{\pgfplotstablerow}{encode-speed-best}\of{result.dat}
+		\edef\rowindex{\pgfplotstablerow}
+		\edef\colname{\pgfplotsretval-encode-speed}
+		\edef\setstyles{\noexpand\pgfplotstableset{
+			every row \rowindex\noexpand\space column \colname/.style={
+				postproc cell content/.append style={
+					/pgfplots/table/@cell content/.add={$\noexpand\mathbf\bgroup}{\egroup$}
+				},
+			}
+		}}\setstyles
+	}]{result.dat}
+\end{threeparttable}
+\caption{Compression speed in MiB per second. The fastest compression of each file is highlighted bold.}
+\label{tbl:compspeed}
+\end{table}
+
+%%%% decoding speeds %%%%
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{.25em}
+\scriptsize
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={file,bwz-decode-speed,tbwz-hirsch-decode-speed,tbwz-greedy-decode-speed,tbwz-greedy-update-decode-speed,
+		bcm-decode-speed,tbcm-hirsch-decode-speed,tbcm-greedy-decode-speed,tbcm-greedy-update-decode-speed,
+		xz-extreme-decode-speed,zpaq-decode-speed}
+	,columns/file/.style={string type,column type=l,column name=File}
+	,columns/bwz-decode-speed/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bw94~\newline~}}}
+	,columns/tbwz-hirsch-decode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-hirsch}}}
+	,columns/tbwz-greedy-decode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-greedy}}}
+	,columns/tbwz-greedy-update-decode-speed/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bw94-t-gupdate}}}
+	,columns/bcm-decode-speed/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bcm~\newline~}}}
+	,columns/tbcm-hirsch-decode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-hirsch}}}
+	,columns/tbcm-greedy-decode-speed/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-greedy}}}
+	,columns/tbcm-greedy-update-decode-speed/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bcm-t-gupdate}}}
+	,columns/xz-extreme-decode-speed/.style={string type,column type=r,              column name=\rotatebox{90}{\parbox{4em}{xz~\newline~}}}
+	,columns/zpaq-decode-speed/.style={string type,column type=r,                    column name=\rotatebox{90}{\parbox{4em}{zpaq~\newline~}}}
+	,row predicate/.code={
+		\pgfplotstablegetelem{\pgfplotstablerow}{decode-speed-best}\of{result.dat}
+		\edef\rowindex{\pgfplotstablerow}
+		\edef\colname{\pgfplotsretval-decode-speed}
+		\edef\setstyles{\noexpand\pgfplotstableset{
+			every row \rowindex\noexpand\space column \colname/.style={
+				postproc cell content/.append style={
+					/pgfplots/table/@cell content/.add={$\noexpand\mathbf\bgroup}{\egroup$}
+				},
+			}
+		}}\setstyles
+	}]{result.dat}
+\end{threeparttable}
+\caption{Decompression speed in MiB per second. The fastest decompression of each file is highlighted bold.}
+\label{tbl:decompspeed}
+\end{table}
+
+%%%% encoding memory peaks %%%%
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{.25em}
+\scriptsize
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={file,bwz-encode-membps,tbwz-hirsch-encode-membps,tbwz-greedy-encode-membps,tbwz-greedy-update-encode-membps,
+		bcm-encode-membps,tbcm-hirsch-encode-membps,tbcm-greedy-encode-membps,tbcm-greedy-update-encode-membps,
+		xz-extreme-encode-membps,zpaq-encode-membps}
+	,columns/file/.style={string type,column type=l,column name=File}
+	,columns/bwz-encode-membps/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bw94~\newline~}}}
+	,columns/tbwz-hirsch-encode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-hirsch}}}
+	,columns/tbwz-greedy-encode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-greedy}}}
+	,columns/tbwz-greedy-update-encode-membps/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bw94-t-gupdate}}}
+	,columns/bcm-encode-membps/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bcm~\newline~}}}
+	,columns/tbcm-hirsch-encode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-hirsch}}}
+	,columns/tbcm-greedy-encode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-greedy}}}
+	,columns/tbcm-greedy-update-encode-membps/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bcm-t-gupdate}}}
+	,columns/xz-extreme-encode-membps/.style={string type,column type=r,              column name=\rotatebox{90}{\parbox{4em}{xz~\newline~}}}
+	,columns/zpaq-encode-membps/.style={string type,column type=r,                    column name=\rotatebox{90}{\parbox{4em}{zpaq~\newline~}}}
+	,row predicate/.code={
+		\pgfplotstablegetelem{\pgfplotstablerow}{encode-membps-best}\of{result.dat}
+		\edef\rowindex{\pgfplotstablerow}
+		\edef\colname{\pgfplotsretval-encode-membps}
+		\edef\setstyles{\noexpand\pgfplotstableset{
+			every row \rowindex\noexpand\space column \colname/.style={
+				postproc cell content/.append style={
+					/pgfplots/table/@cell content/.add={$\noexpand\mathbf\bgroup}{\egroup$}
+				},
+			}
+		}}\setstyles
+	}]{result.dat}
+\end{threeparttable}
+\caption{Compression memory peak in bits per symbol. The compression with the lowest memory peak is highlighted bold.}
+\label{tbl:compmempeak}
+\end{table}
+
+%%%% decoding memory peaks %%%%
+
+\begin{table}[ht]
+\centering
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{.25em}
+\scriptsize
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={file,bwz-decode-membps,tbwz-hirsch-decode-membps,tbwz-greedy-decode-membps,tbwz-greedy-update-decode-membps,
+		bcm-decode-membps,tbcm-hirsch-decode-membps,tbcm-greedy-decode-membps,tbcm-greedy-update-decode-membps,
+		xz-extreme-decode-membps,zpaq-decode-membps}
+	,columns/file/.style={string type,column type=l,column name=File}
+	,columns/bwz-decode-membps/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bw94~\newline~}}}
+	,columns/tbwz-hirsch-decode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-hirsch}}}
+	,columns/tbwz-greedy-decode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bw94-t-greedy}}}
+	,columns/tbwz-greedy-update-decode-membps/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bw94-t-gupdate}}}
+	,columns/bcm-decode-membps/.style={string type,column type=r,                     column name=\rotatebox{90}{\parbox{4em}{bcm~\newline~}}}
+	,columns/tbcm-hirsch-decode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-hirsch}}}
+	,columns/tbcm-greedy-decode-membps/.style={string type,column type=r,             column name=\rotatebox{90}{\parbox{4em}{bcm-t-greedy}}}
+	,columns/tbcm-greedy-update-decode-membps/.style={string type,column type=r,      column name=\rotatebox{90}{\parbox{4em}{bcm-t-gupdate}}}
+	,columns/xz-extreme-decode-membps/.style={string type,column type=r,              column name=\rotatebox{90}{\parbox{4em}{xz~\newline~}}}
+	,columns/zpaq-decode-membps/.style={string type,column type=r,                    column name=\rotatebox{90}{\parbox{4em}{zpaq~\newline~}}}
+	,row predicate/.code={
+		\pgfplotstablegetelem{\pgfplotstablerow}{decode-membps-best}\of{result.dat}
+		\edef\rowindex{\pgfplotstablerow}
+		\edef\colname{\pgfplotsretval-decode-membps}
+		\edef\setstyles{\noexpand\pgfplotstableset{
+			every row \rowindex\noexpand\space column \colname/.style={
+				postproc cell content/.append style={
+					/pgfplots/table/@cell content/.add={$\noexpand\mathbf\bgroup}{\egroup$}
+				},
+			}
+		}}\setstyles
+	}]{result.dat}
+\end{threeparttable}
+\caption{Decompression memory peak in bits per symbol. The decompression with the lowest memory peak is highlighted bold.}
+\label{tbl:decompmempeak}
+\end{table}
+
+\end{document}

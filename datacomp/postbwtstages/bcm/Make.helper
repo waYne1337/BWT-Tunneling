@@ -1,0 +1,5 @@
+BCM_INCS = \
+	bcm_poststage.hpp \
+	bcm_ss.hpp
+BCM_LIBS = \
+	bcm_ss.cpp

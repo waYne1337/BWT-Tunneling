@@ -1,0 +1,86 @@
+\documentclass{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{multirow}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepackage{longtable}
+\usepackage{threeparttable}
+\usepackage{ifthen}
+\usepackage{url}
+\usepackage{hyperref}
+\pgfplotsset{compat=1.9}
+
+\title{\vspace{-5ex}Test data statistics}
+\author{}
+\date{}
+\begin{document}
+\thispagestyle{empty}
+\maketitle
+\thispagestyle{empty}
+
+\vspace{-10ex}
+\centering
+
+%%%% table setup
+\pgfplotstableread{filestat.dat}\filestat
+\pgfplotstablecreatecol[
+	create col/assign/.code={%
+		\getthisrow{category}\entry
+		\getprevrow{category}\preventry
+		\ifthenelse{\equal{\entry}{\preventry}}{
+			\edef\corpus{}
+		}{
+			\edef\corpus{\entry}
+		}
+		\pgfkeyslet{/pgfplots/table/create col/next content}\corpus
+	}]{corpus}\filestat
+
+\begin{threeparttable}
+\newcounter{corpuscount}
+\setcounter{corpuscount}{1}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{1em}
+\scriptsize
+\pgfplotstabletypeset[
+	every head row/.style={
+		before row={\toprule},
+		after row={\midrule}},
+	every last row/.style={
+		after row={\bottomrule}},
+	columns={corpus,file,size,sigma,newlines},
+	columns/file/.style={string type,column type=l,column name={File}},
+	columns/sigma/.style={fixed,column type=r,column name={Alphabet size}},
+	columns/newlines/.style={fixed,column type=r,column name={Lines}},
+	columns/size/.style={fixed,fixed zerofill,precision=3,preproc/expr={##1/(1024*1024)},column type=r,column name={Size in MB}},
+	columns/corpus/.style={string type,column type=l,column name={Text corpus},
+		postproc cell content/.append style={
+			/pgfplots/table/@cell content/.add={\,\ifthenelse{\equal{##1}{}}{}{%
+				\tnote{\thecorpuscount}\addtocounter{corpuscount}{1}%
+				}
+			}
+		}
+	}
+	]\filestat
+%%%% table notes with URLs
+\setcounter{corpuscount}{1}
+\pgfplotstabletypeset[
+	begin table={\begin{tablenotes}}, end table={\end{tablenotes}},
+	before row={\item[\thecorpuscount]  \addtocounter{corpuscount}{1}},
+	after row={},
+	every head row/.style={before row={\iffalse},after row={\fi}},
+	typeset cell/.style={
+		/pgfplots/table/@cell content={\href{#1}{#1}}
+	},
+	skip coltypes,
+	TeX comment=,
+	columns={source},
+	columns/source/.style={string type},
+	unique={category}]\filestat
+\end{threeparttable}
+
+\end{document}

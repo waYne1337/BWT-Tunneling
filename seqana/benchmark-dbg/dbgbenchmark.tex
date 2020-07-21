@@ -1,0 +1,254 @@
+\documentclass{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{multirow}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepackage{longtable}
+\usepackage{threeparttable}
+\usepackage{ifthen}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{expl3}
+\ExplSyntaxOn
+\cs_new_eq:NN \fpeval \fp_eval:n
+\ExplSyntaxOff
+\pgfplotsset{compat=1.13}
+\usetikzlibrary{patterns}
+
+\definecolor{webgreen}{rgb}{0,0.5,0}
+
+\title{\vspace{-5ex}De Bruijn graph edge reduction benchmark results}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\vspace{-10ex}
+\centering
+
+%%%% matrix plot %%%%
+\begin{figure}[h!t]
+\centering
+\pgfplotstablegetrowsof{edgeinfo.dat}
+\edef\filenummatrixplot{\pgfplotsretval}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny Order $k$},
+	xticklabel style={font=\tiny},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=1,xmax=100,
+	yticklabel style={font=\tiny},
+	yticklabel={\pgfmathparse{int(\tick-1)}\pgfplotstablegetelem{\pgfmathresult}{File}\of{edgeinfo.dat}\tiny\pgfplotsretval},
+	ytick={1,...,\filenummatrixplot},
+	ymin=.5,ymax=\filenummatrixplot.5,
+	y dir=reverse,
+	colormap={redyellow}{rgb255(0cm)=(255,255,255); cmyk(2cm)=(0, 0.87, 0.68, 0.32)},
+	colorbar,
+	colorbar style={
+		ytick={0,1},
+		yticklabels={{\tiny \(\substack{\text{least}\\\text{edges}}\)},{\tiny \(\substack{\text{most}\\\text{edges}}\)}},
+		height=20ex
+	},
+	enlargelimits=false,
+	axis on top]
+	\addplot [matrix plot*,point meta=explicit] file [meta=index 2] {edgematrix.dat};
+\end{axis}
+\end{tikzpicture}
+\caption{Dependence between de Bruijn graph order and number of edges in an edge-reduced
+	de Bruijn graph.}
+\label{fig:dbgorderedgedependence}
+\end{figure}
+
+%%%% amount of reduced edges %%%%
+
+\begin{figure}[ht]
+\centering
+\pgfplotstablegetrowsof{benchmark.dat}
+\edef\filenumedgereduceplot{\pgfplotsretval}
+\pgfplotstableset{
+	create on use/min-edge-percentage/.style={
+		create col/expr={\thisrow{min_dbg_edges}*100/\thisrow{input_length}} %later is added for labels
+	},
+	create on use/min-fm-percentage/.style={
+		create col/expr={\thisrow{tfm_index_size}*100/\thisrow{fm_index_size}}
+	},
+	create on use/min-fm-overhead/.style={
+		create col/expr={(\thisrow{tfm_index_size}*100/\thisrow{fm_index_size})-(\thisrow{min_dbg_edges}*100/\thisrow{input_length})}
+	}
+}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny best order $k^*$},
+	yticklabel style={font=\tiny},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={benchmark.dat}{min_dbg_k},
+	ytick=data,
+	xmin=1,	xmax=170,
+	xtick=\empty,
+	bar width=2ex,
+	ymin=-.5,ymax=\filenumedgereduceplot-.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=\coordindex] {benchmark.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny Percentage of original DBG edges respectively original FM-index size},
+	xticklabel style={font=\tiny},
+	xticklabel={\pgfmathprintnumber\tick\%},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=1,	xmax=170,
+	xbar stacked,
+	xmajorgrids=true,	
+	extra x ticks=100,
+	extra x tick labels={},
+	extra x tick style={grid style={black,dashed,very thick}},
+	bar width=2ex,
+	yticklabel style={font=\tiny},
+	yticklabels from table={benchmark.dat}{file},
+	ytick=data,
+	ymin=-.5,ymax=\filenumedgereduceplot-.5,
+	y dir=reverse,
+	ymajorgrids=true,
+	legend style={legend columns=2,draw=none,at={(0.5,-1ex)},anchor=north},
+	area legend,
+	grid style=dashed]
+\addplot+[xbar,draw=black,fill=Maroon!30] table [x=min-edge-percentage, y expr=\coordindex] {benchmark.dat};
+\addplot+[xbar,draw=black,fill=RoyalBlue!30] table [x=min-fm-overhead, y expr=\coordindex] {benchmark.dat};
+\legend{\parbox{12em}{\tiny edge count in minimal DBG},\parbox{12em}{\tiny tunneled FM-index size}}
+\end{axis}
+\end{tikzpicture}
+\caption{Amount of reduced edges for minimal edge-reduced de Bruijn graphs as well as
+	size of corresponding tunneled FM index compared to a normal FM-index.
+	The overhead between the amount of reduced edges and the tunneled FM-index size comes
+	from the two additional bitvectors required in the tunneled FM index.}
+\label{fig:dbgreducededgesexperiments}
+\end{figure}
+
+%%%% required construction runtime %%%%
+
+\begin{figure}[ht]
+\centering
+\pgfplotstablegetrowsof{benchmark.dat}
+\edef\filedbgtimingsplot{\pgfplotsretval}
+\pgfplotstableset{
+	create on use/fm-time-percentage/.style={
+		create col/expr={\thisrow{fm_time}*100/(\thisrow{fm_time} + \thisrow{min_dbg_time} + \thisrow{tfm_time})}
+	},
+	create on use/min-dbg-time-percentage/.style={
+		create col/expr={\thisrow{min_dbg_time}*100/(\thisrow{fm_time} + \thisrow{min_dbg_time} + \thisrow{tfm_time})}
+	},
+	create on use/tfm-time-percentage/.style={
+		create col/expr={(\thisrow{tfm_time}*100/(\thisrow{fm_time} + \thisrow{min_dbg_time} + \thisrow{tfm_time})}
+	},
+	create on use/tfm-total-time-seconds/.style={
+		create col/expr={\fpeval{round(((\thisrow{fm_time} + \thisrow{min_dbg_time} + \thisrow{tfm_time}) / 1000)*1000)/1000}}
+	}
+}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny total time in seconds},
+	yticklabel style={font=\tiny},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={benchmark.dat}{tfm-total-time-seconds},
+	ytick=data,
+	xmin=1,	xmax=100,
+	xtick=\empty,
+	bar width=2ex,
+	ymin=-.5,ymax=\filedbgtimingsplot-.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=\coordindex] {benchmark.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny Percentage of construction time},
+	xticklabel style={font=\tiny},
+	xticklabel={\pgfmathprintnumber\tick\%},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=1,	xmax=100,
+	xbar stacked,
+	bar width=2ex,
+	yticklabel style={font=\tiny},
+	yticklabels from table={benchmark.dat}{file},
+	ytick=data,
+	ymin=-.5,ymax=\filedbgtimingsplot-.5,
+	y dir=reverse,
+	legend style={legend columns=3,draw=none,at={(0.5,-1ex)},anchor=north},
+	area legend,
+	axis on top]   
+\addplot+[xbar,draw=black,fill=Maroon!30] table [x=fm-time-percentage, y expr=\coordindex] {benchmark.dat};
+\addplot+[xbar,draw=black,fill=RoyalBlue!30] table [x=min-dbg-time-percentage, y expr=\coordindex] {benchmark.dat};
+\addplot+[xbar,draw=black,fill=webgreen] table [x=tfm-time-percentage, y expr=\coordindex] {benchmark.dat};
+\legend{\parbox{7.5em}{\tiny FM index},\parbox{7.5em}{\tiny DBG edge minimization},\parbox{7.5em}{\tiny tunneled FM-index}}
+\end{axis}
+\end{tikzpicture}
+\caption{Construction timings of tunneled FM-index construction broken down into
+	FM-index construction, de Bruijn graph edge minimization and tunneled FM-index construction.}
+\label{fig:tfmconstructtimingsexperiments}
+\end{figure}
+
+%%%% required memory peak %%%%
+
+\begin{figure}[ht]
+\centering
+\pgfplotstablegetrowsof{benchmark.dat}
+\edef\filedbgmempeakplot{\pgfplotsretval}
+\pgfplotstableset{
+	create on use/tfm-fmc-mempeak-bytepersymbol/.style={
+		create col/expr={\thisrow{fm_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tfm-mindbg-mempeak-bytepersymbol/.style={
+		create col/expr={\thisrow{min_dbg_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tfm-tfmc-mempeak-bytepersymbol/.style={
+		create col/expr={\thisrow{tfm_mem_peak}/\thisrow{input_length}}
+	},
+	create on use/tfm-mempeak-mbyte/.style={
+		create col/expr={\fpeval{round((max(\thisrow{fm_mem_peak},max(\thisrow{min_dbg_mem_peak},\thisrow{tfm_mem_peak}))/(1024*1024))*1000)/1000}}
+	}
+}
+\begin{tikzpicture}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	ylabel={\tiny memory peak in MiB},
+	yticklabel style={font=\tiny},
+	yticklabel pos=right, ylabel near ticks,
+	yticklabels from table={benchmark.dat}{tfm-mempeak-mbyte},
+	ytick=data,
+	xmin=1,	xmax=10,
+	xtick=\empty,
+	bar width=2ex,
+	ymin=-.5,ymax=\filedbgmempeakplot-.5,
+	y dir=reverse]
+\addplot+[xbar,draw=none,fill=none] table [x expr=-5, y expr=\coordindex] {benchmark.dat};
+\end{axis}
+\begin{axis}[y=2ex,width=.85\textwidth,
+	xlabel={\tiny Memory peak in bytes per input symbol},
+	xticklabel style={font=\tiny},
+	xticklabel pos=top, xlabel near ticks,
+	xmin=1,	xmax=10,
+	no markers,
+	xmajorgrids=true,
+	bar width=.4ex,
+	yticklabel style={font=\tiny},
+	yticklabels from table={benchmark.dat}{file},
+	ytick=data,
+	ymin=-.5,ymax=\filedbgmempeakplot-.5,
+	y dir=reverse,
+	ymajorgrids=true,
+	grid style=dashed,
+	legend style={legend columns=3,no markers,draw=none,at={(0.5,-1ex)},anchor=north},
+	area legend]   
+\addplot+[bar shift=.4ex, xbar,draw=black,ultra thin,fill=Maroon!30] table [x=tfm-fmc-mempeak-bytepersymbol, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=0ex,  xbar,draw=black,ultra thin,fill=RoyalBlue!30] table [x=tfm-mindbg-mempeak-bytepersymbol, y expr=\coordindex] {benchmark.dat};
+\addplot+[bar shift=-.4ex,xbar,draw=black,ultra thin,fill=webgreen] table [x=tfm-tfmc-mempeak-bytepersymbol, y expr=\coordindex] {benchmark.dat};
+\legend{\parbox{7.5em}{\tiny FM index},\parbox{7.5em}{\tiny DBG edge minimization},\parbox{7.5em}{\tiny tunneled FM-index}}
+\end{axis}
+\end{tikzpicture}
+\caption{Memory peak during tunneled FM index construction, measured in bytes per symbol of the input data.}
+\label{fig:tfmconstructmempeaksexperiments}
+\end{figure}
+
+\end{document}
