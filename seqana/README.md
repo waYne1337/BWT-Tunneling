@@ -55,7 +55,7 @@ Depending on the size of the test files, it is useful to have a platform with at
 
 ### Benchmark
 To execute the benchmark, change to the `benchmark-trie` directory and call `make`. The benchmark can be configured using the file
-`benchmark.config`. The benchmark should produce a pdf file containing the results, similar to [this one](benchmark-dbg/triebenchmark.pdf).
+`benchmark.config`. The benchmark should produce a pdf file containing the results, similar to [this one](benchmark-trie/triebenchmark.pdf).
 Note that the benchmark filters lines with less than 10 characters from the output.
 
 Depending on the size of the test files, it is useful to have a platform with at least 16 GB of memory.

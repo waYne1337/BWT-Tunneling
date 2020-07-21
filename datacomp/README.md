@@ -34,5 +34,6 @@ The benchmark can be executed as follows. Go into the `benchmark` directory and 
 1. call `make install` to install and compile the required programs (you may will need superuser rights for this, so use `sudo make install`).
 2. call `make benchmark` to execute the benchmark itself. Depending on the used test files, it might be useful to have 8 GB of memory for files with less than 512 MB size,
    16 GB of memory for files with less than 1 GB size, and up to 32 GB of memory for bigger files.
-3. call `make visualize` to visualize the results in form of a pdf.
+3. call `make visualize` to visualize the results in form of a pdf similar to [this one](benchmark/benchmark.pdf).
+
 All steps can be performed at once by just calling `make`.
