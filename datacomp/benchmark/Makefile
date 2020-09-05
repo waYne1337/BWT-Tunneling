@@ -41,7 +41,7 @@ result.dat:	bin/bwzip.x benchmark.config
 	done
 	@echo " bps-best decode-speed-best decode-membps-best encode-speed-best encode-membps-best" >> result.dat
 	@echo ""
-	@for tcfile in $(COMPRESSORS) ; do \
+	@for tcfile in $(TCFILEPATHS) ; do \
 		tcname=$$(basename "$$tcfile" | tr '_' '-'); \
 		echo -n $$tcname | tee -a result.dat; \
 		tcfs=$$(stat -c%s $$tcfile); \
